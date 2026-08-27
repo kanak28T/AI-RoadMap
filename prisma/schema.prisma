@@ -39,7 +39,6 @@ model Roadmap {
   progress UserProgress[]
 
   @@index([userId])
-  @@index([id, userId])
 }
 
 model UserProgress {
