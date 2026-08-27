@@ -1,9 +1,11 @@
 node_modules/
 .next/
 out/
+
 .env
 .env*.local
+
+generated/prisma/
+
 *.log
 .DS_Store
-generated/
-next-env.d.ts
