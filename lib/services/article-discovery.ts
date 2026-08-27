@@ -17,8 +17,6 @@ interface DevToArticle {
 
 const DEV_TO_API_URL = "https://dev.to/api/articles";
 
-const MIN_REACTIONS = 20;
-
 export async function discoverArticleResources(
   searchKeywords: string[],
   maxResults: number
@@ -28,6 +26,7 @@ export async function discoverArticleResources(
   }
 
   const resources: DiscoveredArticleResource[] = [];
+  const seenUrls = new Set<string>();
 
   for (const keyword of searchKeywords) {
     try {
@@ -35,8 +34,12 @@ export async function discoverArticleResources(
         DEV_TO_API_URL,
         {
           params: {
-            tag: keyword.toLowerCase().replace(/\s+/g, ""),
-            per_page: Math.min(maxResults * 2, 30),
+            tag: keyword
+              .trim()
+              .toLowerCase()
+              .replace(/[^a-z0-9]/g, ""),
+            top: 30,
+            per_page: 30,
           },
           timeout: 10000,
           headers: {
@@ -45,8 +48,14 @@ export async function discoverArticleResources(
         }
       );
 
-      for (const article of response.data ?? []) {
+      const articles = response.data ?? [];
+
+      for (const article of articles) {
         if (!article.title || !article.url) {
+          continue;
+        }
+
+        if (seenUrls.has(article.url)) {
           continue;
         }
 
@@ -55,9 +64,13 @@ export async function discoverArticleResources(
           article.public_reactions_count ??
           0;
 
-        if (reactions < MIN_REACTIONS) {
+        const comments = article.comments_count ?? 0;
+
+        if (reactions === 0 && comments === 0) {
           continue;
         }
+
+        seenUrls.add(article.url);
 
         resources.push({
           title: article.title,
@@ -71,7 +84,6 @@ export async function discoverArticleResources(
         }
       }
     } catch {
-      // A failed article source should not stop discovery.
       continue;
     }
   }
