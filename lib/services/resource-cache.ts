@@ -1,6 +1,6 @@
 import { Redis } from "@upstash/redis";
 
-import type { Resource } from "./resource-discovery.js";
+import type { Resource } from "./resource-discovery";
 
 const redisUrl = process.env.UPSTASH_REDIS_REST_URL;
 const redisToken = process.env.UPSTASH_REDIS_REST_TOKEN;
@@ -61,3 +61,4 @@ export async function cacheResources(
     // Cache failure should never break resource discovery.
   }
 }
+

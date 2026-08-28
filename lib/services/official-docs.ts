@@ -77,3 +77,4 @@ export function discoverOfficialDocs(
 
   return resources;
 }
+

@@ -1,12 +1,12 @@
-import { validateLink } from "./link-validator.js";
-import { discoverOfficialDocs } from "./official-docs.js";
-import { discoverYouTubeResources } from "./youtube-discovery.js";
-import { discoverGitHubResources } from "./github-discovery.js";
-import { discoverArticleResources } from "./article-discovery.js";
+import { validateLink } from "./link-validator";
+import { discoverOfficialDocs } from "./official-docs";
+import { discoverYouTubeResources } from "./youtube-discovery";
+import { discoverGitHubResources } from "./github-discovery";
+import { discoverArticleResources } from "./article-discovery";
 import {
   getCachedResources,
   cacheResources,
-} from "./resource-cache.js";
+} from "./resource-cache";
 
 export type ResourceSource =
   | "Official Docs"
@@ -129,3 +129,4 @@ async function verifyAndDeduplicateResources(
     .filter(({ validation }) => validation.isValid)
     .map(({ resource }) => resource);
 }
+

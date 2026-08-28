@@ -1,7 +1,7 @@
 import {
   discoverResources,
   type Resource,
-} from "./resource-discovery.js";
+} from "./resource-discovery";
 
 export interface RoadmapNode {
   id: string;
@@ -64,3 +64,4 @@ export async function enrichRoadmap(
     nodes: enrichedNodes,
   };
 }
+
