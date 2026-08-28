@@ -83,7 +83,7 @@ ${userProblemContext ? `Learner's problem: "${userProblemContext}"` : ""}
 Generate 1-2 bridge nodes to scaffold the gap.`;
 
   const { object: patch } = await generateObject({
-    model: groq("llama-3.3-70b-versatile"),
+    model: groq("openai/gpt-oss-20b"),
     schema: ReroutePatchSchema,
     system: systemPrompt,
     prompt: userPrompt,

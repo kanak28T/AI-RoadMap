@@ -24,16 +24,42 @@ export async function POST(request: Request) {
 
     const data = parsed.data;
     const currentGraph = await getRoadmapGraph(data.roadmapId, data.userId);
-    const updatedGraph = await rerouteRoadmap({
-      currentGraph,
-      stuckNodeId: data.stuckNodeId,
-      userProblemContext: data.userProblemContext,
-    });
+
+const currentGraphForAI = {
+  title: currentGraph.title,
+  targetRole: currentGraph.targetRole ?? "",
+  totalEstimatedHours: currentGraph.totalEstimatedHours,
+  nodes: currentGraph.nodes.map((node) => ({
+    id: node.id,
+    title: node.title,
+    description:
+      typeof node.description === "string"
+        ? node.description
+        : "",
+    type: node.type,
+    level: node.level,
+    estimatedHours: node.estimatedHours,
+    whyRecommended: node.whyRecommended,
+    searchKeywords: node.searchKeywords,
+    prerequisites: node.prerequisites,
+  })),
+  edges: currentGraph.edges.map((edge, index) => ({
+    id: edge.id ?? `edge-${index}`,
+    source: edge.source,
+    target: edge.target,
+  })),
+};
+
+const updatedGraph = await rerouteRoadmap({
+  currentGraph: currentGraphForAI,
+  stuckNodeId: data.stuckNodeId,
+  userProblemContext: data.userProblemContext,
+});
     const originalNodeIds = new Set(currentGraph.nodes.map((node) => node.id));
     const newNodes = updatedGraph.nodes.filter(
-      (node): node is RoadmapNode =>
-        node.type === "bridge" && !originalNodeIds.has(node.id),
-    );
+  (node) =>
+    node.type === "bridge" && !originalNodeIds.has(node.id),
+);
     const enriched = new Map<string, RoadmapNode>();
 
     for (const node of newNodes) {

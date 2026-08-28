@@ -17,7 +17,7 @@ import { z } from "zod";
 const RoadmapNodeSchema = z.object({
   id: z.string().describe("Unique node id e.g. 'node-1'"),
   title: z.string().describe("Concise skill/topic title"),
-  description: z.string().optional().describe("One sentence description"),
+  description: z.string().describe("One sentence description"),
   type: z
     .enum(["standard", "milestone", "bridge"])
     .describe("Structural role in the DAG"),
@@ -94,7 +94,7 @@ Available time: ${weeklyHours} hours/week for ${timelineWeeks} weeks (${totalAva
 Generate a complete, actionable learning roadmap.`;
 
   const { object } = await generateObject({
-    model: groq("llama-3.3-70b-versatile"),
+    model: groq("openai/gpt-oss-20b"),
     schema: GeneratedRoadmapSchema,
     system: systemPrompt,
     prompt: userPrompt,

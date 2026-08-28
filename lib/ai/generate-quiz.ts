@@ -68,7 +68,7 @@ Difficulty calibration: ${difficulty}
 Generate 3 diagnostic MCQs.`;
 
   const { object } = await generateObject({
-    model: groq("llama-3.3-70b-versatile"),
+    model: groq("openai/gpt-oss-20b"),
     schema: DiagnosticQuizSchema,
     system: systemPrompt,
     prompt: userPrompt,
