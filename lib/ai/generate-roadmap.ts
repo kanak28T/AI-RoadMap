@@ -1,61 +1,89 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // PathCraft AI – Roadmap Generation
 //
-// Generates a personalised, topologically valid DAG via Groq / Llama 3.3.
-// The returned GeneratedRoadmap is a superset of Sanvi's RoadmapNode —
-// AI-specific fields (type, level, estimatedHours, etc.) are carried as
-// open [key: string]: unknown properties so they pass through without
-// breaking her existing types.
+// Generates a personalised learning roadmap using Groq.
+// The AI generates nodes + prerequisites.
+// Edges are derived deterministically in application code.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { generateObject } from "ai";
+import { generateText, Output } from "ai";
 import { groq } from "./groq-client";
 import { z } from "zod";
 
 // ── Zod schemas ──────────────────────────────────────────────────────────────
 
 const RoadmapNodeSchema = z.object({
-  id: z.string().describe("Unique node id e.g. 'node-1'"),
-  title: z.string().describe("Concise skill/topic title"),
-  description: z.string().describe("One sentence description"),
+  id: z.string().describe("Unique node id such as node-1"),
+
+  title: z.string().describe("Concise skill or topic title"),
+
+  description: z
+    .string()
+    .describe("One sentence description of what the learner will learn"),
+
   type: z
     .enum(["standard", "milestone", "bridge"])
-    .describe("Structural role in the DAG"),
+    .describe("Structural role in the learning DAG"),
+
   level: z
     .enum(["Prerequisite", "Core", "Advanced"])
     .describe("Curriculum difficulty tier"),
-  estimatedHours: z.number().positive().describe("Hours to complete this node"),
+
+  estimatedHours: z
+    .number()
+    .describe("Hours required to complete this node"),
+
   whyRecommended: z
     .string()
-    .describe("XAI rationale linking learner background to this node"),
+    .describe(
+      "Explanation connecting the node to the learner's existing skills or target role",
+    ),
+
   searchKeywords: z
     .array(z.string())
-    .length(3)
-    .describe("Exactly 3 search keywords for resource discovery"),
+    .describe("Exactly 3 keywords for learning-resource discovery"),
+
   prerequisites: z
     .array(z.string())
-    .describe("Parent node IDs; empty for root nodes"),
-});
-
-const RoadmapEdgeSchema = z.object({
-  id: z.string().describe("Edge id e.g. 'edge-node1-node2'"),
-  source: z.string().describe("Prerequisite node ID"),
-  target: z.string().describe("Dependent node ID"),
-});
-
-const GeneratedRoadmapSchema = z.object({
-  title: z.string().describe("Roadmap display title"),
-  targetRole: z.string().describe("Role the learner is working towards"),
-  totalEstimatedHours: z.number().positive().describe("Sum of all node hours"),
-  nodes: z.array(RoadmapNodeSchema).min(4).describe("Topologically ordered nodes"),
-  edges: z.array(RoadmapEdgeSchema).describe("Directed prerequisite edges — no cycles"),
+    .describe("IDs of prerequisite nodes. Empty array for root nodes."),
 });
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
 export type AIRoadmapNode = z.infer<typeof RoadmapNodeSchema>;
-export type AIRoadmapEdge = z.infer<typeof RoadmapEdgeSchema>;
-export type GeneratedRoadmap = z.infer<typeof GeneratedRoadmapSchema>;
+
+export interface AIRoadmapEdge {
+  id: string;
+  source: string;
+  target: string;
+  [key: string]: unknown;
+}
+
+const GeneratedRoadmapSchema = z.object({
+  title: z.string().describe("Roadmap display title"),
+
+  targetRole: z
+    .string()
+    .describe("Role the learner is working towards"),
+
+  totalEstimatedHours: z
+    .number()
+    .describe("Estimated total learning hours"),
+
+  nodes: z
+    .array(RoadmapNodeSchema)
+    .describe(
+      "Topologically ordered learning nodes. Prerequisites must appear before dependent nodes.",
+    ),
+});
+
+// AI response before edges are added.
+type GeneratedRoadmapAI = z.infer<typeof GeneratedRoadmapSchema>;
+
+// Final roadmap used by the application.
+export type GeneratedRoadmap = GeneratedRoadmapAI & {
+  edges: AIRoadmapEdge[];
+};
 
 export interface GenerateRoadmapInput {
   goal: string;
@@ -64,43 +92,203 @@ export interface GenerateRoadmapInput {
   timelineWeeks: number;
 }
 
-// ── Main function ────────────────────────────────────────────────────────────
+// ── Deterministic edge generation ────────────────────────────────────────────
+//
+// The AI does NOT generate edges.
+//
+// If node-2 has:
+// prerequisites: ["node-1"]
+//
+// our application creates:
+//
+// {
+//   id: "edge-node-1-node-2",
+//   source: "node-1",
+//   target: "node-2"
+// }
+//
+// This avoids asking the AI to generate the same relationship twice.
+// ─────────────────────────────────────────────────────────────────────────────
+
+function deriveEdgesFromPrerequisites(
+  nodes: AIRoadmapNode[],
+): AIRoadmapEdge[] {
+  return nodes.flatMap((node) =>
+    node.prerequisites.map((prerequisiteId) => ({
+      id: `edge-${prerequisiteId}-${node.id}`,
+      source: prerequisiteId,
+      target: node.id,
+    })),
+  );
+}
+
+// ── Main roadmap generation function ─────────────────────────────────────────
 
 export async function generateRoadmap(
-  input: GenerateRoadmapInput
+  input: GenerateRoadmapInput,
 ): Promise<GeneratedRoadmap> {
-  const { goal, existingSkills, weeklyHours, timelineWeeks } = input;
+  const {
+    goal,
+    existingSkills,
+    weeklyHours,
+    timelineWeeks,
+  } = input;
+
   const totalAvailableHours = weeklyHours * timelineWeeks;
-  const skillList = existingSkills.length > 0 ? existingSkills.join(", ") : "none listed";
+
+  const skillList =
+    existingSkills.length > 0
+      ? existingSkills.join(", ")
+      : "none listed";
+
+  // ── System prompt ─────────────────────────────────────────────────────────
 
   const systemPrompt = `You are PathCraft AI, an expert curriculum designer and learning-path architect.
-Produce a personalised learning roadmap as structured JSON conforming to the schema.
+
+Create a personalised learning roadmap for the learner.
+
+Return ONLY a JSON object matching the provided schema.
 
 Rules:
-- Output a directed acyclic graph (DAG). Edges must NEVER create a cycle.
-- Nodes must be topologically ordered (prerequisites before dependents).
-- Total estimatedHours must not exceed ${totalAvailableHours} hours (${weeklyHours} h/week × ${timelineWeeks} weeks).
-- Omit skills the learner already knows: [${skillList}].
-- Include at least one "milestone" node every 4 standard nodes.
-- Every node's whyRecommended must reference the learner's existing skills or target role.
-- Every node needs exactly 3 searchKeywords for a learning-resource search engine.
-- Edge IDs follow the pattern "edge-<source>-<target>".
-- Node IDs are stable slugs: "node-1", "node-2", etc.`;
 
-  const userPrompt = `Goal: ${goal}
+1. Create a directed acyclic learning graph.
+2. Nodes must be topologically ordered.
+3. A prerequisite node MUST appear before the node that depends on it.
+4. Every prerequisite must reference an existing node ID.
+5. Never create a circular dependency.
+6. Do NOT include skills that the learner already knows.
+7. Total estimated hours must not exceed ${totalAvailableHours} hours.
+8. Create at least 4 learning nodes.
+9. Include milestone nodes at useful progress points.
+10. Every node's whyRecommended must connect the topic to the learner's existing skills or target role.
+11. Every node must contain exactly 3 search keywords.
+12. Node IDs must use the format node-1, node-2, node-3, etc.
+13. Use an empty prerequisites array for root nodes.
+14. Do NOT generate an edges field.
+15. Return only fields defined in the schema.
+
+Learner target:
+${goal}
+
+Existing skills:
+${skillList}
+
+Available learning time:
+${weeklyHours} hours per week for ${timelineWeeks} weeks.
+
+Total available time:
+${totalAvailableHours} hours.`;
+
+// ── User prompt ─────────────────────────────────────────────────────────────
+
+  const userPrompt = `Generate a complete and actionable learning roadmap.
+
+Goal: ${goal}
+
 Existing skills: ${skillList}
-Available time: ${weeklyHours} hours/week for ${timelineWeeks} weeks (${totalAvailableHours} total hours)
 
-Generate a complete, actionable learning roadmap.`;
+Weekly availability: ${weeklyHours} hours
 
-  const { object } = await generateObject({
+Target duration: ${timelineWeeks} weeks
+
+Total available time: ${totalAvailableHours} hours
+
+The roadmap should progress from prerequisites to core skills to advanced skills and milestones.`;
+
+// ── AI generation ──────────────────────────────────────────────────────────
+
+  const { output } = await generateText({
     model: groq("openai/gpt-oss-20b"),
-    schema: GeneratedRoadmapSchema,
+
     system: systemPrompt,
+
     prompt: userPrompt,
+
+    output: Output.object({
+      schema: GeneratedRoadmapSchema,
+      name: "learning_roadmap",
+      description:
+        "A personalised learning roadmap containing ordered learning nodes and their prerequisites.",
+    }),
+
+    maxRetries: 2,
+
+    providerOptions: {
+      groq: {
+        structuredOutputs: true,
+        strictJsonSchema: true,
+        reasoningEffort: "low",
+      },
+    },
   });
 
-  // Recompute total from actual nodes to guard against model drift
-  const derivedTotal = object.nodes.reduce((sum, n) => sum + n.estimatedHours, 0);
-  return { ...object, totalEstimatedHours: derivedTotal };
+  if (!output) {
+    throw new Error("Groq did not return a roadmap.");
+  }
+
+  // ── Manual validation ────────────────────────────────────────────────────
+
+  if (output.nodes.length < 4) {
+    throw new Error("Generated roadmap must contain at least 4 nodes.");
+  }
+
+  const nodeIds = new Set(
+    output.nodes.map((node) => node.id),
+  );
+
+  for (const node of output.nodes) {
+    // Validate estimated hours.
+    if (node.estimatedHours <= 0) {
+      throw new Error(
+        `Invalid estimatedHours for node "${node.id}".`,
+      );
+    }
+
+    // Validate exactly 3 search keywords.
+    if (node.searchKeywords.length !== 3) {
+      throw new Error(
+        `Node "${node.id}" must contain exactly 3 search keywords.`,
+      );
+    }
+
+    // Validate prerequisite references.
+    for (const prerequisiteId of node.prerequisites) {
+      if (!nodeIds.has(prerequisiteId)) {
+        throw new Error(
+          `Invalid prerequisite "${prerequisiteId}" referenced by node "${node.id}".`,
+        );
+      }
+
+      if (prerequisiteId === node.id) {
+        throw new Error(
+          `Node "${node.id}" cannot be its own prerequisite.`,
+        );
+      }
+    }
+  }
+
+  // ── Derive edges locally ──────────────────────────────────────────────────
+
+  const edges = deriveEdgesFromPrerequisites(output.nodes);
+
+  // ── Recompute total from actual nodes ─────────────────────────────────────
+
+  const derivedTotal = output.nodes.reduce(
+    (sum, node) => sum + node.estimatedHours,
+    0,
+  );
+
+  if (derivedTotal > totalAvailableHours) {
+    throw new Error(
+      `Generated roadmap requires ${derivedTotal} hours, exceeding the available ${totalAvailableHours} hours.`,
+    );
+  }
+
+  // ── Return application-ready roadmap ──────────────────────────────────────
+
+  return {
+    ...output,
+    totalEstimatedHours: derivedTotal,
+    edges,
+  };
 }

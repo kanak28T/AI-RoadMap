@@ -5,8 +5,7 @@
 // stuck node itself, producing an updated valid DAG.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { generateObject } from "ai";
-import { groq } from "./groq-client";
+import { generateText, Output } from "ai";import { groq } from "./groq-client";
 import { z } from "zod";
 import type { GeneratedRoadmap, AIRoadmapNode, AIRoadmapEdge } from "./generate-roadmap";
 
@@ -82,12 +81,32 @@ ${userProblemContext ? `Learner's problem: "${userProblemContext}"` : ""}
 
 Generate 1-2 bridge nodes to scaffold the gap.`;
 
-  const { object: patch } = await generateObject({
-    model: groq("openai/gpt-oss-20b"),
+  const { output: patch } = await generateText({
+  model: groq("openai/gpt-oss-20b"),
+  system: systemPrompt,
+  prompt: userPrompt,
+
+  output: Output.object({
     schema: ReroutePatchSchema,
-    system: systemPrompt,
-    prompt: userPrompt,
-  });
+    name: "roadmap_reroute",
+    description:
+      "One or two remedial bridge learning nodes that unblock the learner.",
+  }),
+
+  maxRetries: 2,
+
+  providerOptions: {
+    groq: {
+      structuredOutputs: true,
+      strictJsonSchema: true,
+      reasoningEffort: "low",
+    },
+  },
+});
+
+if (!patch) {
+  throw new Error("Groq did not return a roadmap reroute.");
+}
 
   // Build full AIRoadmapNode objects for each bridge
   const bridgeNodes: AIRoadmapNode[] = patch.bridgeNodes.map((b, index) => ({

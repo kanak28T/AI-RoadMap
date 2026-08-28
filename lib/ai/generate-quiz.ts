@@ -1,78 +1,169 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // PathCraft AI – Diagnostic Quiz Generation
 //
-// Generates 3 MCQs for a given roadmap node calibrated to its difficulty level.
-// Questions conform to Sanvi's QuizQuestion interface (id, question, options,
-// correctAnswer) so they can be stored directly in the diagnosticQuiz table.
+// Generates 3 MCQs for a given roadmap node.
+// The generated format matches the shared QuizQuestion interface:
+// question, options, answerIndex, explanation.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { generateObject } from "ai";
+import { generateText, Output } from "ai";
 import { groq } from "./groq-client";
 import { z } from "zod";
 
-// ── Zod schema ────────────────────────────────────────────────────────────────
+// ── Zod schemas ──────────────────────────────────────────────────────────────
 
 const QuestionSchema = z.object({
-  id: z.string().describe("Unique question id e.g. 'q1', 'q2', 'q3'"),
-  question: z.string().describe("Clear question stem testing a single concept"),
-  options: z.array(z.string()).length(4).describe("Exactly 4 answer choices"),
-  correctAnswer: z
+  id: z
     .string()
-    .describe("The exact text of the correct option (must match one of the options)"),
+    .describe("Unique question id: q1, q2, or q3"),
+
+  question: z
+    .string()
+    .describe("Clear question testing one concept"),
+
+  options: z
+    .array(z.string())
+    .length(4)
+    .describe("Exactly 4 answer choices"),
+
+  answerIndex: z
+    .number()
+    .int()
+    .min(0)
+    .max(3)
+    .describe(
+      "Zero-based index of the correct answer. 0 means first option, 1 second, 2 third, 3 fourth.",
+    ),
+
   explanation: z
     .string()
-    .describe("2-3 sentences explaining why the correct answer is right"),
+    .describe("Short explanation of why the correct answer is correct"),
 });
 
 const DiagnosticQuizSchema = z.object({
-  questions: z.array(QuestionSchema).length(3).describe("Exactly 3 MCQs"),
+  questions: z
+    .array(QuestionSchema)
+    .length(3)
+    .describe("Exactly 3 diagnostic MCQs"),
 });
 
 export type GeneratedQuestion = z.infer<typeof QuestionSchema>;
 
 // ── Main function ────────────────────────────────────────────────────────────
 
-/**
- * Generates a 3-question diagnostic MCQ quiz for a roadmap node.
- * Returns questions compatible with Sanvi's QuizQuestion interface.
- */
 export async function generateQuiz(
   nodeId: string,
   nodeTitle: string,
-  nodeLevel: string
-): Promise<{ nodeId: string; questions: GeneratedQuestion[] }> {
+  nodeLevel: string,
+): Promise<{
+  nodeId: string;
+  questions: GeneratedQuestion[];
+}> {
   const difficultyGuide: Record<string, string> = {
-    Prerequisite: "foundational recall and recognition — basic definitions and correct usage",
-    Core: "applied understanding — solving realistic problems and explaining behaviour",
-    Advanced: "synthesis and critical thinking — trade-offs, edge cases, design decisions",
+    Prerequisite:
+      "foundational recall and recognition — basic definitions and correct usage",
+
+    Core:
+      "applied understanding — solving realistic problems and explaining behaviour",
+
+    Advanced:
+      "synthesis and critical thinking — trade-offs, edge cases, and design decisions",
   };
 
-  const difficulty = difficultyGuide[nodeLevel] ?? "applied understanding appropriate to the topic";
+  const difficulty =
+    difficultyGuide[nodeLevel] ??
+    "applied understanding appropriate to the topic";
 
   const systemPrompt = `You are PathCraft AI, an expert instructional designer specialised in technical education.
-Generate exactly 3 multiple-choice diagnostic questions for a learning node.
+
+Generate exactly 3 multiple-choice diagnostic questions for the specified learning topic.
 
 Rules:
-- Each question tests a DISTINCT concept within the topic.
-- Each question has EXACTLY 4 answer choices.
-- Exactly ONE answer is correct; the other three are plausible distractors.
-- correctAnswer must be the exact text of the correct option (not an index).
-- question IDs are "q1", "q2", "q3".
-- The explanation clarifies why the correct answer is right and addresses common misconceptions.
-- Calibrate difficulty as described below.`;
+- Generate exactly 3 questions.
+- Each question must test a DISTINCT concept.
+- Each question must have EXACTLY 4 options.
+- Exactly ONE option must be correct.
+- answerIndex MUST be a number from 0 to 3.
+- answerIndex is the ZERO-BASED position of the correct option.
+- 0 = first option.
+- 1 = second option.
+- 2 = third option.
+- 3 = fourth option.
+- Do NOT generate a correctAnswer field.
+- Question IDs must be q1, q2, and q3.
+- Explanations should briefly explain why the selected answer is correct.
+- Follow the provided schema exactly.
+- Return only the structured quiz data.`;
 
-  const userPrompt = `Topic: "${nodeTitle}"
+  const userPrompt = `Create a diagnostic quiz for this learning node.
+
+Topic: "${nodeTitle}"
+
 Curriculum level: ${nodeLevel}
-Difficulty calibration: ${difficulty}
 
-Generate 3 diagnostic MCQs.`;
+Difficulty calibration:
+${difficulty}
 
-  const { object } = await generateObject({
+Generate exactly 3 MCQs.`;
+
+  const { output } = await generateText({
     model: groq("openai/gpt-oss-20b"),
-    schema: DiagnosticQuizSchema,
+
     system: systemPrompt,
+
     prompt: userPrompt,
+
+    output: Output.object({
+      schema: DiagnosticQuizSchema,
+      name: "diagnostic_quiz",
+      description:
+        "Exactly three diagnostic multiple-choice questions.",
+    }),
+
+    maxRetries: 2,
+
+    providerOptions: {
+      groq: {
+        structuredOutputs: true,
+        strictJsonSchema: true,
+        reasoningEffort: "low",
+      },
+    },
   });
 
-  return { nodeId, questions: object.questions };
+  if (!output) {
+    throw new Error(
+      "Groq did not return diagnostic quiz questions.",
+    );
+  }
+
+  // ── Additional application-side validation ────────────────────────────────
+
+  if (output.questions.length !== 3) {
+    throw new Error(
+      `Expected 3 quiz questions but received ${output.questions.length}.`,
+    );
+  }
+
+  for (const question of output.questions) {
+    if (question.options.length !== 4) {
+      throw new Error(
+        `Question ${question.id} must contain exactly 4 options.`,
+      );
+    }
+
+    if (
+      question.answerIndex < 0 ||
+      question.answerIndex > 3
+    ) {
+      throw new Error(
+        `Question ${question.id} has an invalid answerIndex.`,
+      );
+    }
+  }
+
+  return {
+    nodeId,
+    questions: output.questions,
+  };
 }

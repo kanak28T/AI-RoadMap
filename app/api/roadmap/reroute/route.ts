@@ -23,25 +23,29 @@ export async function POST(request: Request) {
     }
 
     const data = parsed.data;
-    const currentGraph = await getRoadmapGraph(data.roadmapId, data.userId);
+    const currentGraph = await getRoadmapGraph(
+  data.roadmapId,
+  data.userId,
+);
 
 const currentGraphForAI = {
   title: currentGraph.title,
-  targetRole: currentGraph.targetRole ?? "",
+  targetRole: currentGraph.targetRole,
   totalEstimatedHours: currentGraph.totalEstimatedHours,
   nodes: currentGraph.nodes.map((node) => ({
     id: node.id,
     title: node.title,
-    description:
-      typeof node.description === "string"
-        ? node.description
-        : "",
+    description: String(node.description ?? ""),
     type: node.type,
     level: node.level,
-    estimatedHours: node.estimatedHours,
-    whyRecommended: node.whyRecommended,
-    searchKeywords: node.searchKeywords,
-    prerequisites: node.prerequisites,
+    estimatedHours: Number(node.estimatedHours),
+    whyRecommended: String(node.whyRecommended ?? ""),
+    searchKeywords: Array.isArray(node.searchKeywords)
+      ? node.searchKeywords.map(String)
+      : [],
+    prerequisites: Array.isArray(node.prerequisites)
+      ? node.prerequisites.map(String)
+      : [],
   })),
   edges: currentGraph.edges.map((edge, index) => ({
     id: edge.id ?? `edge-${index}`,
@@ -49,6 +53,7 @@ const currentGraphForAI = {
     target: edge.target,
   })),
 };
+
 
 const updatedGraph = await rerouteRoadmap({
   currentGraph: currentGraphForAI,
@@ -70,9 +75,23 @@ const updatedGraph = await rerouteRoadmap({
     }
 
     const finalGraph = {
-      ...updatedGraph,
-      nodes: updatedGraph.nodes.map((node) => enriched.get(node.id) ?? node),
-    };
+  title: updatedGraph.title,
+  targetRole: updatedGraph.targetRole,
+  totalEstimatedHours: updatedGraph.totalEstimatedHours,
+
+  nodes: updatedGraph.nodes.map((node) => ({
+    ...node,
+    description: String(node.description ?? ""),
+    resources:
+      enriched.get(node.id)?.resources ?? [],
+  })),
+
+  edges: updatedGraph.edges.map((edge) => ({
+    id: edge.id,
+    source: edge.source,
+    target: edge.target,
+  })),
+};
     await updateRoadmapGraph(data.roadmapId, finalGraph, data.userId);
 
     const bridgeIds = new Set(newNodes.map((node) => node.id));
