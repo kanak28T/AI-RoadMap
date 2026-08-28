@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { IntakeWizard } from '@/components/intake/intake-wizard';
 import { useRoadmapStore } from '@/store/use-roadmap-store';
 import { Sparkles, Target, Clock, TrendingUp } from 'lucide-react';
 
@@ -98,23 +99,7 @@ export default function HomePage() {
       </div>
 
       {/* Placeholder for Intake Wizard */}
-      {showIntake && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white p-8 rounded-xl max-w-md">
-            <h3 className="text-xl font-bold mb-4">Intake Wizard</h3>
-            <p className="text-slate-600 mb-4">
-              Coming soon! This will be a multi-step form to capture:
-            </p>
-            <ul className="list-disc list-inside text-sm text-slate-600 space-y-1 mb-6">
-              <li>Your learning goal</li>
-              <li>Existing skills</li>
-              <li>Weekly time commitment</li>
-              <li>Target timeline</li>
-            </ul>
-            <Button onClick={() => setShowIntake(false)}>Close</Button>
-          </div>
-        </div>
-      )}
+      <IntakeWizard open={showIntake} onOpenChange={setShowIntake} />
     </div>
   );
 }
