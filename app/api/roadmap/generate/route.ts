@@ -45,6 +45,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       roadmapId: saved.id,
+      userId,
       title: saved.title,
       totalEstimatedHours: saved.totalHours,
       nodes: saved.nodes,

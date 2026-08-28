@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { updateProgress } from "../../../../lib/services/progress.service";
+import { upsertUser } from "../../../../lib/services/roadmap.service";
 import { updateProgressSchema } from "../../../../lib/validators/progress";
 
 export async function POST(request: Request) {
@@ -19,8 +20,12 @@ export async function POST(request: Request) {
       );
     }
 
+    const userId = parsed.data.userId ?? await upsertUser({
+      email: "guest@pathcraft.ai",
+      name: "Guest",
+    });
     const result = await updateProgress(
-      parsed.data.userId,
+      userId,
       parsed.data.roadmapId,
       parsed.data.nodeId,
       parsed.data.status,
