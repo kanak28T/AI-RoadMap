@@ -4,6 +4,7 @@ import { useCallback, useMemo } from 'react';
 import {
   ReactFlow,
   Background,
+  BackgroundVariant,
   Controls,
   MiniMap,
   useNodesState,
@@ -14,7 +15,6 @@ import '@xyflow/react/dist/style.css';
 import { CustomNode } from './custom-node';
 import { getLayoutedElements } from '@/lib/dagre-layout';
 import { useRoadmapStore } from '@/store/use-roadmap-store';
-import type { CustomNodeData } from '@/types';
 
 const nodeTypes = {
   custom: CustomNode,
@@ -50,7 +50,7 @@ export function RoadmapCanvas({
   // Transform roadmap edges to React Flow edges
   const initialEdges: Edge[] = useMemo(() => {
     return roadmapEdges.map((edge) => ({
-      id: `${edge.source}-${edge.target}`,
+      id: edge.id ?? `${edge.source}-${edge.target}`,
       source: edge.source,
       target: edge.target,
       type: 'smoothstep',
@@ -97,7 +97,7 @@ export function RoadmapCanvas({
           color="#CBD5E1"
           gap={20}
           size={1}
-          variant="dots"
+          variant={BackgroundVariant.Dots}
         />
         <Controls
           showInteractive={false}
@@ -105,16 +105,12 @@ export function RoadmapCanvas({
         />
         <MiniMap
           nodeColor={(node) => {
-            const data = node.data as CustomNodeData;
-            switch (data.status) {
-              case 'COMPLETED':
-                return '#10B981';
-              case 'IN_PROGRESS':
-                return '#F59E0B';
-              case 'STUCK':
-                return '#F43F5E';
-              default:
-                return '#94A3B8';
+            const d = node.data as Record<string, string>;
+            switch (d.status) {
+              case 'COMPLETED':  return '#10B981';
+              case 'IN_PROGRESS': return '#F59E0B';
+              case 'STUCK':      return '#F43F5E';
+              default:           return '#94A3B8';
             }
           }}
           className="!bg-white !border !border-slate-200 !rounded-lg !shadow-card"

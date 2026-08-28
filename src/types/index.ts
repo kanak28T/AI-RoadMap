@@ -1,4 +1,4 @@
-// Core Types for PathCraft AI
+// PathCraft AI – Unified types (aligned with Kanak, Reshal, and Sanvi's schemas)
 
 export type NodeStatus = "PENDING" | "IN_PROGRESS" | "COMPLETED" | "STUCK";
 export type NodeType = "standard" | "milestone" | "bridge";
@@ -6,36 +6,43 @@ export type NodeLevel = "Prerequisite" | "Core" | "Advanced";
 export type ResourceSource = "Official Docs" | "YouTube" | "GitHub" | "Article";
 export type ResourceType = "Video" | "Article" | "Repo";
 
+// Reshal's verified resource shape
 export interface Resource {
   title: string;
   url: string;
   source: ResourceSource;
   type: ResourceType;
   isVerified: boolean;
-  duration?: string; // e.g., "15 min" or "2h 30m"
+  duration?: string;
 }
 
+// Kanak's node shape + Sanvi's status + Reshal's resources
 export interface RoadmapNode {
-  id: string; // e.g., "node_1"
-  title: string; // e.g., "React Fundamentals"
+  id: string;
+  title: string;
   type: NodeType;
   level: NodeLevel;
   estimatedHours: number;
-  whyRecommended: string; // XAI explanation
+  whyRecommended: string;
+  searchKeywords: string[];
+  prerequisites: string[];
+  // Added at frontend (from Sanvi's UserProgress)
   status: NodeStatus;
+  // Added by Reshal's enrichment
   resources: Resource[];
-  prerequisites: string[]; // Array of parent node IDs
 }
 
+// Kanak's edge shape (id is required — "edge-node1-node2")
 export interface RoadmapEdge {
-  source: string; // Source node ID
-  target: string; // Target node ID
+  id: string;
+  source: string;
+  target: string;
 }
 
 export interface QuizQuestion {
   question: string;
-  options: string[]; // 4 options
-  answerIndex: number; // 0-3 (correct answer)
+  options: string[];
+  answerIndex: number;
   explanation: string;
 }
 
@@ -44,14 +51,14 @@ export interface DiagnosticQuiz {
   questions: QuizQuestion[];
 }
 
-// API Request/Response Types
+// ── API Types ─────────────────────────────────────────────────────────────────
 
 export interface GenerateRoadmapRequest {
-  userId?: string; // Optional for now
   goal: string;
   existingSkills: string[];
   weeklyHours: number;
   targetWeeks: number;
+  userId?: string;
 }
 
 export interface GenerateRoadmapResponse {
@@ -63,10 +70,10 @@ export interface GenerateRoadmapResponse {
 }
 
 export interface UpdateProgressRequest {
-  userId?: string;
   roadmapId: string;
   nodeId: string;
   status: NodeStatus;
+  userId?: string;
 }
 
 export interface UpdateProgressResponse {
@@ -77,10 +84,10 @@ export interface UpdateProgressResponse {
 }
 
 export interface RerouteRequest {
-  userId?: string;
   roadmapId: string;
   stuckNodeId: string;
   userProblemContext?: string;
+  userId?: string;
 }
 
 export interface RerouteResponse {
@@ -91,20 +98,20 @@ export interface RerouteResponse {
 }
 
 export interface QuizSubmissionRequest {
-  userId?: string;
   roadmapId: string;
   nodeId: string;
-  answers: number[]; // User's selected indices
+  answers: number[];
+  userId?: string;
 }
 
 export interface QuizSubmissionResponse {
-  score: number; // 0-100
-  passed: boolean; // true if 100%
+  score: number;
+  passed: boolean;
   explanations: string[];
-  autoCompleted: boolean; // Node marked completed
+  autoCompleted: boolean;
 }
 
-// React Flow Types (for canvas)
+// React Flow extended node data
 export interface CustomNodeData extends RoadmapNode {
   onOpenDrawer: (nodeId: string) => void;
   onMarkComplete: (nodeId: string) => void;

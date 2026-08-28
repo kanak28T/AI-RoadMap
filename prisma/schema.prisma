@@ -1,0 +1,70 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ProgressStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  STUCK
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  createdAt DateTime @default(now())
+
+  roadmaps Roadmap[]
+  progress UserProgress[]
+}
+
+model Roadmap {
+  id         String   @id @default(cuid())
+  userId     String
+  title      String
+  goal       String
+  totalHours Float
+  nodes      Json
+  edges      Json
+  isPublic   Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  user     User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  progress UserProgress[]
+
+  @@index([userId])
+}
+
+model UserProgress {
+  id          String         @id @default(cuid())
+  userId      String
+  roadmapId   String
+  nodeId      String
+  status      ProgressStatus @default(PENDING)
+  completedAt DateTime?
+  quizScore   Float?
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  roadmap Roadmap @relation(fields: [roadmapId], references: [id], onDelete: Cascade)
+
+  @@unique([roadmapId, nodeId, userId])
+  @@index([roadmapId, userId])
+  @@index([userId])
+}
+
+model DiagnosticQuiz {
+  id        String @id @default(cuid())
+  nodeId    String
+  roadmapId String
+  questions Json
+
+  @@unique([roadmapId, nodeId])
+  @@index([nodeId])
+  @@index([roadmapId])
+}
