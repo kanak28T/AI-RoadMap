@@ -9,3 +9,4 @@ generated/prisma/
 
 *.log
 .DS_Store
+tsconfig.tsbuildinfo
