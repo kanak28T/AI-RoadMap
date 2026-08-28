@@ -13,7 +13,7 @@ const redis =
       })
     : null;
 
-const CACHE_TTL_SECONDS = 60 * 60 * 24; // 24 hours
+const CACHE_TTL_SECONDS = 60 * 60 * 24;
 
 function createCacheKey(searchKeywords: string[]): string {
   const normalizedKeywords = [...searchKeywords]
@@ -21,7 +21,7 @@ function createCacheKey(searchKeywords: string[]): string {
     .filter(Boolean)
     .sort();
 
-  return `pathcraft:resources:${normalizedKeywords.join("|")}`;
+  return "pathcraft:resources:" + normalizedKeywords.join("|");
 }
 
 export async function getCachedResources(
@@ -33,12 +33,10 @@ export async function getCachedResources(
 
   try {
     const key = createCacheKey(searchKeywords);
-
     const cached = await redis.get<Resource[]>(key);
 
     return cached ?? null;
   } catch {
-    // Cache failure should never break resource discovery.
     return null;
   }
 }
@@ -58,7 +56,6 @@ export async function cacheResources(
       ex: CACHE_TTL_SECONDS,
     });
   } catch {
-    // Cache failure should never break resource discovery.
+    // Redis failure must never break resource discovery.
   }
 }
-

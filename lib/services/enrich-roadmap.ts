@@ -6,7 +6,7 @@ import {
 export interface RoadmapNode {
   id: string;
   title: string;
-  type: "standard" | "milestone";
+  type: "standard" | "milestone" | "bridge";
   level: "Prerequisite" | "Core" | "Advanced";
   estimatedHours: number;
   whyRecommended: string;
@@ -22,6 +22,7 @@ export interface RoadmapEdge {
 
 export interface RoadmapGraph {
   title: string;
+  targetRole?: string;
   totalEstimatedHours: number;
   nodes: RoadmapNode[];
   edges: RoadmapEdge[];
@@ -41,7 +42,7 @@ export interface EnrichedRoadmapGraph
  * Enriches every roadmap node with verified learning resources.
  *
  * The original roadmap structure is preserved.
- * Only the `resources` field is added to each node.
+ * Only the esources field is added to each node.
  */
 export async function enrichRoadmap(
   roadmap: RoadmapGraph
@@ -64,4 +65,3 @@ export async function enrichRoadmap(
     nodes: enrichedNodes,
   };
 }
-
