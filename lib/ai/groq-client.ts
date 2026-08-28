@@ -9,13 +9,6 @@
 
 import { createOpenAI } from "@ai-sdk/openai";
 
-if (!process.env.GROQ_API_KEY) {
-  throw new Error(
-    "Missing GROQ_API_KEY environment variable. " +
-      "Add it to .env.local: GROQ_API_KEY=your_key_here"
-  );
-}
-
 /**
  * Shared Groq provider instance.
  *
@@ -29,5 +22,5 @@ if (!process.env.GROQ_API_KEY) {
  */
 export const groq = createOpenAI({
   baseURL: "https://api.groq.com/openai/v1",
-  apiKey: process.env.GROQ_API_KEY,
+  apiKey: process.env.GROQ_API_KEY ?? "",
 });
