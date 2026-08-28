@@ -10,8 +10,13 @@
     "postinstall": "prisma skills sync || exit 0"
   },
   "dependencies": {
+    "@ai-sdk/openai": "^4.0.50",
     "@prisma/adapter-pg": "^7.10.0",
     "@prisma/client": "^7.10.0",
+    "@upstash/redis": "^1.38.3",
+    "ai": "^7.0.83",
+    "axios": "^1.20.0",
+    "cheerio": "^1.2.0",
     "dotenv": "^17.4.2",
     "next": "^16.3.3",
     "pg": "^8.23.0",
@@ -29,6 +34,7 @@
     "eslint-config-next": "^16.3.3",
     "prisma": "^7.10.0",
     "tailwindcss": "^4.3.3",
+    "tsx": "^4.19.2",
     "typescript": "^5.9.3"
   },
   "type": "module"

@@ -60,8 +60,10 @@ model UserProgress {
 
 model DiagnosticQuiz {
   id        String @id @default(cuid())
+  roadmapId String
   nodeId    String
   questions Json
 
+  @@unique([roadmapId, nodeId])
   @@index([nodeId])
 }

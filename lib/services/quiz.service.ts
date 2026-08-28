@@ -11,8 +11,10 @@ function getQuestions(value: unknown): QuizQuestion[] {
     (item): item is QuizQuestion =>
       typeof item === "object" &&
       item !== null &&
-      "id" in item &&
-      "question" in item,
+      typeof item.question === "string" &&
+      Array.isArray(item.options) &&
+      typeof item.answerIndex === "number" &&
+      typeof item.explanation === "string",
   );
 }
 
@@ -29,7 +31,7 @@ export async function submitQuiz(
   userId: string,
   roadmapId: string,
   nodeId: string,
-  answers: Record<string, string | number>,
+  answers: number[],
 ): Promise<{
   result: QuizResult;
   unlockedNodeIds: string[];
@@ -41,6 +43,8 @@ export async function submitQuiz(
     select: {
       id: true,
       userId: true,
+      title: true,
+      totalHours: true,
       nodes: true,
       edges: true,
     },
@@ -55,7 +59,7 @@ export async function submitQuiz(
   }
 
   const quiz = await prisma.diagnosticQuiz.findFirst({
-    where: { nodeId },
+    where: { roadmapId, nodeId },
   });
 
   if (!quiz) {
@@ -70,17 +74,11 @@ export async function submitQuiz(
 
   let correctAnswers = 0;
 
-  for (const question of questions) {
-    const submittedAnswer = answers[question.id];
-
-    if (
-      submittedAnswer !== undefined &&
-      question.correctAnswer !== undefined &&
-      submittedAnswer === question.correctAnswer
-    ) {
+  questions.forEach((question, index) => {
+    if (answers[index] === question.answerIndex) {
       correctAnswers++;
     }
-  }
+  });
 
   const score = Math.round(
     (correctAnswers / questions.length) * 100,
@@ -115,6 +113,8 @@ export async function submitQuiz(
 
   if (completed) {
     const graph: RoadmapGraph = {
+      title: roadmap.title,
+      totalEstimatedHours: roadmap.totalHours,
       nodes: Array.isArray(roadmap.nodes)
         ? roadmap.nodes as RoadmapGraph["nodes"]
         : [],

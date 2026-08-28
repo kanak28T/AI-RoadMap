@@ -1,7 +1,11 @@
 import { getPrisma } from "../db/prisma";
 import { calculateProgress } from "../progress";
-import type { ProgressStatus, RoadmapGraph } from "../../types/roadmap";
-
+import type {
+  ProgressStatus,
+  RoadmapEdge,
+  RoadmapGraph,
+  RoadmapNode,
+} from "../../types/roadmap";
 export async function updateProgress(
   userId: string,
   roadmapId: string,
@@ -15,6 +19,8 @@ export async function updateProgress(
     select: {
       id: true,
       userId: true,
+      title: true,
+      totalHours: true,
       nodes: true,
       edges: true,
     },
@@ -29,11 +35,13 @@ export async function updateProgress(
   }
 
   const graph: RoadmapGraph = {
+    title: roadmap.title,
+    totalEstimatedHours: roadmap.totalHours,
     nodes: Array.isArray(roadmap.nodes)
-      ? roadmap.nodes as RoadmapGraph["nodes"]
+      ? roadmap.nodes as RoadmapNode[]
       : [],
     edges: Array.isArray(roadmap.edges)
-      ? roadmap.edges as RoadmapGraph["edges"]
+      ? roadmap.edges as RoadmapEdge[]
       : [],
   };
 
@@ -92,6 +100,8 @@ export async function getProgress(
     select: {
       id: true,
       userId: true,
+      title: true,
+      totalHours: true,
       nodes: true,
       edges: true,
     },
@@ -113,6 +123,8 @@ export async function getProgress(
   });
 
   const graph: RoadmapGraph = {
+    title: roadmap.title,
+    totalEstimatedHours: roadmap.totalHours,
     nodes: Array.isArray(roadmap.nodes)
       ? roadmap.nodes as RoadmapGraph["nodes"]
       : [],

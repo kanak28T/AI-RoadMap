@@ -1,11 +1,29 @@
 import { getPrisma } from "../db/prisma";
 import type {
   CreateRoadmapInput,
+  GeneratedRoadmap,
   RoadmapGraph,
 } from "../../types/roadmap";
 
+interface UserIdentityInput {
+  email: string;
+  name?: string;
+}
+
 function toJson(value: unknown) {
   return JSON.parse(JSON.stringify(value));
+}
+
+export async function upsertUser(input: UserIdentityInput): Promise<string> {
+  const prisma = getPrisma();
+  const user = await prisma.user.upsert({
+    where: { email: input.email },
+    update: { name: input.name },
+    create: input,
+    select: { id: true },
+  });
+
+  return user.id;
 }
 
 export async function createRoadmap(input: CreateRoadmapInput) {
@@ -57,6 +75,25 @@ export async function getRoadmap(
   return roadmap;
 }
 
+export async function getRoadmapGraph(
+  roadmapId: string,
+  userId?: string,
+): Promise<GeneratedRoadmap> {
+  const roadmap = await getRoadmap(roadmapId, userId);
+
+  if (!Array.isArray(roadmap.nodes) || !Array.isArray(roadmap.edges)) {
+    throw new Error("Roadmap graph is invalid");
+  }
+
+  return {
+    title: roadmap.title,
+    targetRole: roadmap.goal,
+    totalEstimatedHours: roadmap.totalHours,
+    nodes: roadmap.nodes as GeneratedRoadmap["nodes"],
+    edges: roadmap.edges as GeneratedRoadmap["edges"],
+  };
+}
+
 export async function updateRoadmapGraph(
   roadmapId: string,
   graph: RoadmapGraph,
@@ -83,6 +120,7 @@ export async function updateRoadmapGraph(
   return prisma.roadmap.update({
     where: { id: roadmapId },
     data: {
+      totalHours: graph.totalEstimatedHours,
       nodes: toJson(graph.nodes),
       edges: toJson(graph.edges),
     },

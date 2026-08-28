@@ -1,15 +1,15 @@
 export interface QuizQuestion {
-  id: string;
   question: string;
-  options?: string[];
-  correctAnswer?: string | number;
+  options: string[];
+  answerIndex: number;
+  explanation: string;
 }
 
 export interface QuizSubmission {
   userId: string;
   roadmapId: string;
   nodeId: string;
-  answers: Record<string, string | number>;
+  answers: number[];
 }
 
 export interface QuizResult {

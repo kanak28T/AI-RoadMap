@@ -4,10 +4,22 @@ export type ProgressStatus =
   | "COMPLETED"
   | "STUCK";
 
+export type RoadmapNodeType = "standard" | "milestone" | "bridge";
+
+export type RoadmapLevel =
+  | "Prerequisite"
+  | "Core"
+  | "Advanced";
+
 export interface RoadmapNode {
   id: string;
-  title?: string;
-  description?: string;
+  title: string;
+  type: RoadmapNodeType;
+  level: RoadmapLevel;
+  estimatedHours: number;
+  whyRecommended: string;
+  searchKeywords: string[];
+  prerequisites: string[];
   [key: string]: unknown;
 }
 
@@ -19,7 +31,45 @@ export interface RoadmapEdge {
 }
 
 export interface RoadmapGraph {
+  title: string;
+  targetRole?: string;
+  totalEstimatedHours: number;
   nodes: RoadmapNode[];
+  edges: RoadmapEdge[];
+  [key: string]: unknown;
+}
+
+export interface GeneratedRoadmap extends RoadmapGraph {
+  targetRole: string;
+}
+
+export interface DiagnosticQuiz {
+  nodeId: string;
+  questions: Array<{
+    question: string;
+    options: string[];
+    answerIndex: number;
+    explanation: string;
+  }>;
+}
+
+export interface EnrichedRoadmapNode extends RoadmapNode {
+  resources: Resource[];
+}
+
+export interface Resource {
+  title: string;
+  url: string;
+  source: "Official Docs" | "YouTube" | "GitHub" | "Article";
+  type: "Video" | "Article" | "Repo";
+  isVerified: true;
+}
+
+export interface EnrichedRoadmapGraph {
+  title: string;
+  targetRole?: string;
+  totalEstimatedHours: number;
+  nodes: EnrichedRoadmapNode[];
   edges: RoadmapEdge[];
 }
 
