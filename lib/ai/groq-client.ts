@@ -2,9 +2,9 @@
 // PathCraft AI – Groq Provider Client
 //
 // Groq exposes an OpenAI-compatible REST API, so we reuse `createOpenAI` from
-// `@ai-sdk/openai` and simply point it at Groq's base URL.
+// `@ai-sdk/openai` pointed at Groq's base URL.
 //
-// Set GROQ_API_KEY in your .env.local (free tier available at console.groq.com).
+// Set GROQ_API_KEY in .env.local (free tier at console.groq.com).
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { createOpenAI } from "@ai-sdk/openai";
@@ -13,10 +13,10 @@ import { createOpenAI } from "@ai-sdk/openai";
  * Shared Groq provider instance.
  *
  * Usage:
- *   import { groq } from "./groq-client";
+ *   import { groq } from "@/lib/ai/groq-client";
  *   const model = groq("llama-3.3-70b-versatile");
  *
- * Available models (free tier):
+ * Available free-tier models:
  *   - "llama-3.3-70b-versatile"  — best quality, structured output support
  *   - "llama-3.1-8b-instant"     — fastest, lowest latency
  */
