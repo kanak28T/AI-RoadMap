@@ -2,10 +2,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import prisma from "@/lib/db/prisma";
+import type { NodeStatus, RoadmapNode } from "@/types";
 
 const RequestSchema = z.object({
-  roadmapId: z.string(),
-  nodeId: z.string(),
+  roadmapId: z.string().min(1),
+  nodeId: z.string().min(1),
   status: z.enum(["PENDING", "IN_PROGRESS", "COMPLETED", "STUCK"]),
   userId: z.string().optional(),
 });
@@ -24,13 +25,20 @@ export async function POST(req: NextRequest) {
 
     const { roadmapId, nodeId, status, userId } = parsed.data;
 
-    // Resolve userId
+    // Resolve userId — fall back to guest
     const resolvedUserId =
       userId ??
-      (await prisma.user.findUnique({ where: { email: "guest@pathcraft.ai" } }))?.id;
+      (await prisma.user.findUnique({ where: { email: "guest@pathcraft.ai" } }))
+        ?.id;
 
     if (!resolvedUserId) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
+    }
+
+    // Verify roadmap exists and belongs to user
+    const roadmap = await prisma.roadmap.findUnique({ where: { id: roadmapId } });
+    if (!roadmap) {
+      return NextResponse.json({ error: "Roadmap not found" }, { status: 404 });
     }
 
     // Upsert progress record
@@ -38,55 +46,47 @@ export async function POST(req: NextRequest) {
       where: {
         roadmapId_nodeId_userId: { roadmapId, nodeId, userId: resolvedUserId },
       },
-      update: {
-        status,
-        completedAt: status === "COMPLETED" ? new Date() : null,
-      },
       create: {
         userId: resolvedUserId,
         roadmapId,
         nodeId,
-        status,
+        status: status as NodeStatus,
+        completedAt: status === "COMPLETED" ? new Date() : null,
+      },
+      update: {
+        status: status as NodeStatus,
         completedAt: status === "COMPLETED" ? new Date() : null,
       },
     });
 
-    // Recalculate aggregate metrics
-    const roadmap = await prisma.roadmap.findUnique({ where: { id: roadmapId } });
-    if (!roadmap) {
-      return NextResponse.json({ error: "Roadmap not found" }, { status: 404 });
-    }
-
+    // Recalculate progress metrics
     const allProgress = await prisma.userProgress.findMany({
       where: { roadmapId, userId: resolvedUserId },
+      select: { nodeId: true, status: true },
     });
 
-    const totalNodes = (roadmap.nodes as unknown[]).length;
-    const completedCount = allProgress.filter(
-      (p: { status: string }) => p.status === "COMPLETED"
-    ).length;
+    const allNodes = roadmap.nodes as unknown as RoadmapNode[];
+    const totalNodes = allNodes.length;
+    const completedIds = new Set(
+      allProgress.filter((p) => p.status === "COMPLETED").map((p) => p.nodeId)
+    );
+    const completedCount = completedIds.size;
     const completionPercentage =
       totalNodes > 0 ? Math.round((completedCount / totalNodes) * 100) : 0;
 
-    // Count completed milestones
-    const milestoneNodes = (roadmap.nodes as Array<{ id: string; type: string }>)
-      .filter((n) => n.type === "milestone")
-      .map((n) => n.id);
-    const milestonesReached = allProgress.filter(
-      (p: { status: string; nodeId: string }) =>
-        p.status === "COMPLETED" && milestoneNodes.includes(p.nodeId)
+    // Milestones at 25 / 50 / 75 / 100 %
+    const milestonesReached = [25, 50, 75, 100].filter(
+      (m) => completionPercentage >= m
     ).length;
 
-    // Find newly unlocked nodes (all prerequisites completed)
-    const completedIds = new Set(
-      allProgress
-        .filter((p: { status: string }) => p.status === "COMPLETED")
-        .map((p: { nodeId: string }) => p.nodeId)
-    );
-    const allNodes = roadmap.nodes as Array<{ id: string; prerequisites: string[] }>;
+    // Nodes whose every prerequisite is now completed
     const unlockedNodes = allNodes
-      .filter((node) => node.prerequisites.every((prereqId) => completedIds.has(prereqId)))
-      .map((node) => node.id);
+      .filter(
+        (n) =>
+          !completedIds.has(n.id) &&
+          n.prerequisites.every((prereqId) => completedIds.has(prereqId))
+      )
+      .map((n) => n.id);
 
     return NextResponse.json({
       success: true,

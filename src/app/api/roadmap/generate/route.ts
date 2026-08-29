@@ -12,6 +12,7 @@ const RequestSchema = z.object({
   weeklyHours: z.number().min(1).max(80),
   targetWeeks: z.number().min(1).max(52),
   userId: z.string().optional(),
+  roadmapType: z.enum(["personalized", "course-focused"]).optional(),
 });
 
 export async function POST(req: NextRequest) {
@@ -26,7 +27,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { goal, existingSkills, weeklyHours, targetWeeks, userId } = parsed.data;
+    const { goal, existingSkills, weeklyHours, targetWeeks, userId, roadmapType } = parsed.data;
 
     // ── Step 1: Kanak generates the DAG ─────────────────────────────────────
     const rawRoadmap = await generateRoadmap({
@@ -34,6 +35,7 @@ export async function POST(req: NextRequest) {
       existingSkills,
       weeklyHours,
       timelineWeeks: targetWeeks,
+      roadmapType,
     });
 
     // ── Step 2: Reshal enriches with verified resources ──────────────────────
@@ -78,7 +80,11 @@ export async function POST(req: NextRequest) {
       roadmapId: roadmap.id,
       title: roadmap.title,
       totalEstimatedHours: roadmap.totalHours,
-      nodes: enrichedRoadmap.nodes,
+      nodes: enrichedRoadmap.nodes.map((node) => ({
+        ...node,
+        status: "PENDING" as const,
+        resources: node.resources ?? [],
+      })),
       edges: enrichedRoadmap.edges,
     });
   } catch (err) {

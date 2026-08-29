@@ -12,16 +12,23 @@ export function ProgressBar() {
     getMilestoneCount,
     getCompletedMilestones,
     nodes,
+    spine,
   } = useRoadmapStore();
 
-  const completedCount = getCompletedCount();
-  const totalNodes = nodes.length;
+  const subTopics = spine.flatMap((node) => node.subTopics ?? []);
+  const completedSubtopics = subTopics.filter((topic) => topic.status === 'COMPLETED').length;
+  const totalSubtopics = subTopics.length;
+  const completedCount = totalSubtopics > 0
+    ? completedSubtopics
+    : getCompletedCount();
+  const totalNodes = totalSubtopics > 0 ? totalSubtopics : nodes.length;
+  const progress = totalNodes > 0 ? Math.round((completedCount / totalNodes) * 100) : 0;
   const milestoneCount = getMilestoneCount();
   const completedMilestones = getCompletedMilestones();
 
   return (
     <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10">
-      <div className="bg-white border border-slate-200 rounded-xl shadow-card p-4 min-w-[400px]">
+      <div className="w-[calc(100vw-2rem)] max-w-[400px] bg-white border border-slate-200 rounded-xl shadow-card p-4">
         {/* Title */}
         <div className="flex items-center gap-2 mb-3">
           <Target className="w-4 h-4 text-brand-600" />
@@ -34,12 +41,12 @@ export function ProgressBar() {
         <div className="mb-3">
           <div className="flex items-center justify-between text-xs text-slate-600 mb-1">
             <span>Progress</span>
-            <span className="font-semibold">{completionPercentage}%</span>
+            <span className="font-semibold">{totalSubtopics > 0 ? progress : completionPercentage}%</span>
           </div>
           <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
             <div
               className="h-full bg-gradient-to-r from-brand-600 to-brand-500 transition-all duration-500"
-              style={{ width: `${completionPercentage}%` }}
+              style={{ width: `${totalSubtopics > 0 ? progress : completionPercentage}%` }}
             />
           </div>
         </div>

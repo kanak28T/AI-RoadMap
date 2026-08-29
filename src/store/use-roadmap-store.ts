@@ -12,6 +12,7 @@ interface RoadmapStore {
   roadmapId: string | null;
   title: string | null;
   nodes: RoadmapNode[];
+  spine: RoadmapNode[];
   edges: RoadmapEdge[];
   selectedNode: string | null;
   completionPercentage: number;
@@ -37,6 +38,7 @@ export const useRoadmapStore = create<RoadmapStore>()(
       roadmapId: null,
       title: null,
       nodes: [],
+      spine: [],
       edges: [],
       selectedNode: null,
       completionPercentage: 0,
@@ -46,7 +48,20 @@ export const useRoadmapStore = create<RoadmapStore>()(
       setRoadmap: (data) => set({
         roadmapId: data.roadmapId,
         title: data.title,
-        nodes: data.nodes,
+        nodes: data.nodes.map((node) => ({
+          ...node,
+          status: node.status ?? "PENDING",
+          resources: node.resources ?? [],
+          searchKeywords: node.searchKeywords ?? [],
+          prerequisites: node.prerequisites ?? [],
+        })),
+        spine: (data.spine ?? data.nodes).map((node) => ({
+          ...node,
+          status: node.status ?? "PENDING",
+          resources: node.resources ?? [],
+          searchKeywords: node.searchKeywords ?? [],
+          prerequisites: node.prerequisites ?? [],
+        })),
         edges: data.edges,
         totalEstimatedHours: data.totalEstimatedHours,
         completionPercentage: 0,
@@ -70,14 +85,22 @@ export const useRoadmapStore = create<RoadmapStore>()(
       selectNode: (nodeId) => set({ selectedNode: nodeId }),
       
       addBridgeNodes: (newNodes, newEdges) => set((state) => ({
-        nodes: [...state.nodes, ...newNodes],
-        edges: [...state.edges, ...newEdges],
+        nodes: [
+          ...state.nodes,
+          ...newNodes.map((node) => ({
+            ...node,
+            status: node.status ?? "PENDING",
+            resources: node.resources ?? [],
+          })),
+        ],
+        edges: newEdges.length > 0 ? newEdges : state.edges,
       })),
       
       clearRoadmap: () => set({
         roadmapId: null,
         title: null,
         nodes: [],
+        spine: [],
         edges: [],
         selectedNode: null,
         completionPercentage: 0,

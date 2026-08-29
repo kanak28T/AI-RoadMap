@@ -12,7 +12,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, ChevronRight, ChevronLeft, Sparkles } from 'lucide-react';
+import { Loader2, ChevronRight, ChevronLeft, Sparkles, BookOpen, Route } from 'lucide-react';
 import { useRoadmapStore } from '@/store/use-roadmap-store';
 import { api } from '@/lib/api';
 import type { GenerateRoadmapRequest } from '@/types';
@@ -49,6 +49,7 @@ export function IntakeWizard({ open, onOpenChange }: IntakeWizardProps) {
     existingSkills: [],
     weeklyHours: 10,
     targetWeeks: 8,
+    roadmapType: 'personalized',
   });
 
   const handleSkillToggle = (skill: string) => {
@@ -81,6 +82,7 @@ export function IntakeWizard({ open, onOpenChange }: IntakeWizardProps) {
     if (step === 2) return formData.existingSkills.length > 0;
     if (step === 3) return formData.weeklyHours > 0;
     if (step === 4) return formData.targetWeeks > 0;
+    if (step === 5) return Boolean(formData.roadmapType);
     return false;
   };
 
@@ -100,7 +102,7 @@ export function IntakeWizard({ open, onOpenChange }: IntakeWizardProps) {
         <div className="space-y-6 py-4">
           {/* Progress Indicator */}
           <div className="flex items-center gap-2">
-            {[1, 2, 3, 4].map((i) => (
+            {[1, 2, 3, 4, 5].map((i) => (
               <div
                 key={i}
                 className={`h-2 flex-1 rounded-full transition-colors ${
@@ -254,6 +256,35 @@ export function IntakeWizard({ open, onOpenChange }: IntakeWizardProps) {
             </div>
           )}
 
+          {step === 5 && (
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm font-medium mb-2 block">How should we shape your path?</label>
+                <p className="text-sm text-slate-600">Choose the kind of guidance you want to see on your map.</p>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={() => setFormData({ ...formData, roadmapType: 'personalized' })}
+                  className={`text-left p-4 rounded-lg border-2 transition-colors ${formData.roadmapType === 'personalized' ? 'border-brand-600 bg-brand-50' : 'border-slate-200 hover:border-slate-400'}`}
+                >
+                  <Route className="w-5 h-5 text-brand-600 mb-3" />
+                  <span className="block font-semibold text-slate-900">A path made for me</span>
+                  <span className="block text-sm text-slate-600 mt-1">Adjust the route around what you already know and where you want to go.</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFormData({ ...formData, roadmapType: 'course-focused' })}
+                  className={`text-left p-4 rounded-lg border-2 transition-colors ${formData.roadmapType === 'course-focused' ? 'border-brand-600 bg-brand-50' : 'border-slate-200 hover:border-slate-400'}`}
+                >
+                  <BookOpen className="w-5 h-5 text-brand-600 mb-3" />
+                  <span className="block font-semibold text-slate-900">A guided course trail</span>
+                  <span className="block text-sm text-slate-600 mt-1">Organize the journey around practical courses, tools, and framework choices.</span>
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Error Message */}
           {error && (
             <div className="p-4 bg-rose-50 border border-rose-200 rounded-lg">
@@ -282,7 +313,7 @@ export function IntakeWizard({ open, onOpenChange }: IntakeWizardProps) {
               {step > 1 ? 'Back' : 'Cancel'}
             </Button>
 
-            {step < 4 ? (
+            {step < 5 ? (
               <Button
                 onClick={() => setStep(step + 1)}
                 disabled={!canProceed()}

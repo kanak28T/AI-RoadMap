@@ -16,6 +16,22 @@ export interface Resource {
   duration?: string;
 }
 
+export type RoadmapType = 'personalized' | 'course-focused';
+
+export interface RoadmapSubTopic {
+  id: string;
+  title: string;
+  description?: string;
+  recommendation?: 'recommended' | 'alternative';
+  type?: 'recommended' | 'alternative';
+  isRecommended?: boolean;
+  isAlternative?: boolean;
+  isChoiceGroup?: boolean;
+  status?: NodeStatus;
+  resources?: Resource[];
+  whyRecommended?: string;
+}
+
 // Kanak's node shape + Sanvi's status + Reshal's resources
 export interface RoadmapNode {
   id: string;
@@ -30,6 +46,8 @@ export interface RoadmapNode {
   status: NodeStatus;
   // Added by Reshal's enrichment
   resources: Resource[];
+  subTopics?: RoadmapSubTopic[];
+  isChoiceGroup?: boolean;
 }
 
 // Kanak's edge shape (id is required — "edge-node1-node2")
@@ -59,6 +77,7 @@ export interface GenerateRoadmapRequest {
   weeklyHours: number;
   targetWeeks: number;
   userId?: string;
+  roadmapType?: RoadmapType;
 }
 
 export interface GenerateRoadmapResponse {
@@ -67,7 +86,10 @@ export interface GenerateRoadmapResponse {
   totalEstimatedHours: number;
   nodes: RoadmapNode[];
   edges: RoadmapEdge[];
+  spine?: RoadmapNode[];
 }
+
+export type RoadmapData = GenerateRoadmapResponse;
 
 export interface UpdateProgressRequest {
   roadmapId: string;

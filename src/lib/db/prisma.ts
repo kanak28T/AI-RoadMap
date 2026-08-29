@@ -1,17 +1,27 @@
-// PathCraft AI – Prisma Client Singleton (Sanvi's layer)
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const { PrismaClient } = require("@prisma/client");
+// PathCraft AI – Prisma Client Singleton (Prisma v7 + pg driver adapter)
+import { PrismaClient } from '@prisma/client';
+import { PrismaPg } from '@prisma/adapter-pg';
 
-type PrismaClientType = InstanceType<typeof PrismaClient>;
+declare global {
+  // eslint-disable-next-line no-var
+  var __prisma: PrismaClient | undefined;
+}
 
-const globalForPrisma = globalThis as unknown as { prisma: PrismaClientType };
+function createPrismaClient(): PrismaClient {
+  const connectionString = process.env.DATABASE_URL;
+  if (!connectionString) {
+    throw new Error('DATABASE_URL environment variable is not set');
+  }
+  const adapter = new PrismaPg({ connectionString });
+  return new PrismaClient({ adapter } as ConstructorParameters<typeof PrismaClient>[0]);
+}
 
-const prisma: PrismaClientType =
-  globalForPrisma.prisma ??
-  new PrismaClient({
-    log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
-  });
+// Re-use single instance in dev to avoid exhausting connection pool on HMR
+export const prisma: PrismaClient =
+  globalThis.__prisma ?? createPrismaClient();
 
-if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
+if (process.env.NODE_ENV !== 'production') {
+  globalThis.__prisma = prisma;
+}
 
 export default prisma;

@@ -1,7 +1,6 @@
 // PathCraft AI – Quiz Generator (Kanak's layer)
-// Ported from feature/kanak-ai-orchestration:lib/ai/generate-quiz.ts
-import { generateObject } from "ai";
-import { groq } from "./groq-client";
+import { generateText } from "ai";
+import { groq, GROQ_MODEL } from "./groq-client";
 import { z } from "zod";
 
 export interface DiagnosticQuiz {
@@ -14,52 +13,85 @@ export interface DiagnosticQuiz {
   }>;
 }
 
-const DiagnosticQuizSchema = z.object({
+const QuizSchema = z.object({
   questions: z.array(
     z.object({
       question: z.string(),
-      options: z.array(z.string()).length(4),
+      options: z.array(z.string()).min(4).max(4),
       answerIndex: z.number().int().min(0).max(3),
       explanation: z.string(),
     })
-  ).length(3),
+  ).min(3).max(3),
 });
+
+function extractJson(text: string): string {
+  const start = text.indexOf("{");
+  if (start === -1) throw new Error("No JSON found");
+  let depth = 0, end = -1;
+  for (let i = start; i < text.length; i++) {
+    if (text[i] === "{") depth++;
+    else if (text[i] === "}") { depth--; if (depth === 0) { end = i; break; } }
+  }
+  if (end === -1) throw new Error("Unbalanced JSON");
+  return text.slice(start, end + 1);
+}
 
 export async function generateQuiz(
   nodeId: string,
   nodeTitle: string,
   nodeLevel: string
 ): Promise<DiagnosticQuiz> {
-  const difficultyGuide: Record<string, string> = {
-    Prerequisite: "foundational recall and recognition — basic definitions and correct usage",
-    Core: "applied understanding — solve realistic problems and explain behaviour",
-    Advanced: "synthesis and critical thinking — trade-offs, edge cases, design decisions",
+  const difficulty: Record<string, string> = {
+    Prerequisite: "basic definitions and recognition",
+    Core: "applied understanding and problem solving",
+    Advanced: "synthesis, trade-offs and design decisions",
   };
 
-  const difficulty = difficultyGuide[nodeLevel] ?? "applied understanding";
+  const prompt = `You are an expert instructional designer. Generate exactly 3 multiple-choice quiz questions for this learning topic.
 
-  const systemPrompt = `You are PathCraft AI, an expert instructional designer.
-Generate exactly 3 multiple-choice diagnostic questions for a learning node.
+TOPIC: "${nodeTitle}"
+LEVEL: ${nodeLevel} — focus on ${difficulty[nodeLevel] ?? "applied understanding"}
+
+Return ONLY valid JSON matching this exact structure:
+{
+  "questions": [
+    {
+      "question": "string",
+      "options": ["option A", "option B", "option C", "option D"],
+      "answerIndex": 0,
+      "explanation": "string explaining why the answer is correct"
+    }
+  ]
+}
 
 Rules:
-- Each question tests a DISTINCT concept.
-- Each question has EXACTLY 4 answer choices.
-- Exactly ONE answer is correct; three are plausible distractors.
-- answerIndex is zero-based (0–3).
-- explanation states why the correct answer is right and addresses common misconceptions.
-- Do NOT include the answer in the question stem.`;
+- Exactly 3 questions, each with exactly 4 options.
+- answerIndex is 0-3 (index of correct option).
+- Each question tests a DIFFERENT concept.
+- Return ONLY the JSON, no markdown, no code fences.`;
 
-  const userPrompt = `Topic: "${nodeTitle}"
-Level: ${nodeLevel}
-Difficulty: ${difficulty}
-Generate 3 diagnostic MCQs.`;
+  let lastError: Error | null = null;
 
-  const { object } = await generateObject({
-    model: groq("llama-3.3-70b-versatile"),
-    schema: DiagnosticQuizSchema,
-    system: systemPrompt,
-    prompt: userPrompt,
-  });
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const { text } = await generateText({
+        model: groq(GROQ_MODEL),
+        prompt,
+        maxOutputTokens: 1500,
+        temperature: attempt === 1 ? 0.3 : 0.1,
+      });
 
-  return { nodeId, questions: object.questions };
+      const jsonStr = extractJson(text);
+      const parsed = JSON.parse(jsonStr);
+      const validated = QuizSchema.parse(parsed);
+      return { nodeId, questions: validated.questions };
+
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err));
+      console.error(`[generateQuiz] attempt ${attempt} failed:`, lastError.message);
+      if (attempt < 3) await new Promise(r => setTimeout(r, 1000 * attempt));
+    }
+  }
+
+  throw lastError ?? new Error("Failed to generate quiz after 3 attempts");
 }
